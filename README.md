@@ -1,161 +1,219 @@
-# K8s Testing Cluster In Seconds
+# K3s Learning Lab
 
-This project helps you create a lightweight local Kubernetes testing cluster inside Docker using `k3s`. It is meant for learning, experimenting, and practicing basic Kubernetes commands without setting up a full cloud cluster.
+This project creates a local multi-node Kubernetes lab using `k3s` and Docker Compose. It is designed for learning Kubernetes basics on a cluster that includes one control-plane node and two worker nodes.
 
 ## What This Project Gives You
 
-- A local single-node Kubernetes cluster using `k3s`
-- `kubectl` preconfigured inside the container
-- A sample application you can deploy with one command
-- A safe playground for learning core Kubernetes concepts
+- A local multi-node Kubernetes cluster
+- One `k3s` server node
+- Two `k3s` worker nodes
+- `kubectl` ready to use inside the server container
+- A sample app you can deploy with one command
+- A simple environment for learning scheduling, services, deployments, and cluster basics
 
 ## What Gets Launched
 
-When you start the container and run `./setup.sh`, this project creates:
+When you start the lab, this project brings up:
 
-- One local `k3s` Kubernetes cluster
-- One namespace: `k8s-testing`
-- One deployment: `echo-app`
-- Two pods managed by the deployment
-- One service: `echo-service`
+- `k3s-server`: the control-plane node
+- `k3s-worker-1`: a worker node
+- `k3s-worker-2`: a worker node
+- A Docker bridge network for the cluster containers
+
+When you run `./setup.sh` inside the server container, it also creates:
+
+- Namespace: `k8s-testing`
+- Deployment: `echo-app`
+- Replicas: `3`
+- Service: `echo-service`
 
 ## Why This Is Useful
 
-You can use this project to:
+You can use this lab to:
 
-- Learn the difference between Pods, Deployments, Services, and Namespaces
+- Learn how control-plane and worker nodes work
 - Practice `kubectl` commands in a real cluster
-- Test simple YAML manifests
-- Understand service discovery and label selectors
-- Explore logs, rollout status, scaling, and debugging basics
-- Build confidence before moving to larger Kubernetes environments
+- Understand pod scheduling across multiple nodes
+- Explore Deployments, Pods, Services, Endpoints, and Namespaces
+- Learn labels, selectors, scaling, and service routing
+- Test simple manifests before using a bigger environment
 
 ## Project Files
 
-- `Dockerfile`: builds the learning environment with `k3s` and `kubectl`
-- `setup.sh`: creates the namespace, deployment, and service
-- `task.yaml`: small metadata file describing the environment
-- `README.md`: setup guide and learning notes
+- `Dockerfile`: base image used for the `k3s` server and worker nodes
+- `docker-compose.yml`: starts the multi-node cluster
+- `setup.sh`: deploys the sample namespace, deployment, and service
+- `task.yaml`: small metadata file describing the lab
+- `README.md`: setup guide and learning walkthrough
 
-## Step 1: Build The Docker Image
+## Start The Multi-Node Cluster
 
-```bash
-docker build -t k8s-testing-cluster .
-```
-
-## Step 2: Run The Container
-
-Run the container in privileged mode so `k3s` can start correctly:
+Build and start the cluster:
 
 ```bash
-docker run --privileged -d --name k8s-testing-cluster k8s-testing-cluster
+docker compose up -d --build
 ```
 
-## Step 3: Open A Shell Inside The Container
-
-Wait about 15 to 30 seconds for the cluster to boot, then enter the container:
+If your system uses the older Compose CLI:
 
 ```bash
-docker exec -it k8s-testing-cluster bash
+docker-compose up -d --build
 ```
 
-## Step 4: Check That Kubernetes Is Ready
+## Open A Shell In The Server Node
 
-Use these commands first:
+Wait about 20 to 40 seconds, then enter the control-plane container:
+
+```bash
+docker exec -it k3s-server bash
+```
+
+This is the main container where you will run `kubectl`.
+
+## Check Cluster Status
+
+Inside the `k3s-server` container, run:
 
 ```bash
 kubectl get nodes
+kubectl get nodes -o wide
 kubectl cluster-info
-kubectl get ns
+kubectl get namespaces
 ```
 
-You should see the node in `Ready` state.
+You should see `3` nodes in `Ready` state.
 
-## Step 5: Create The Practice Workload
+## Deploy The Practice Workload
 
-Run:
+Inside `k3s-server`, run:
 
 ```bash
 ./setup.sh
 ```
 
-This deploys a simple echo application in the `k8s-testing` namespace.
+This deploys a simple echo app with `3` replicas so you can observe scheduling across nodes.
 
-## Basic Kubernetes Commands To Try
+## Basic Commands To Learn Kubernetes
 
-These are good starter commands for a learner:
+These are great starter commands:
 
 ```bash
 kubectl get nodes
-kubectl get namespaces
+kubectl get pods -A -o wide
 kubectl get all -n k8s-testing
-kubectl get pods -n k8s-testing
+kubectl get pods -n k8s-testing -o wide
 kubectl get svc -n k8s-testing
 kubectl get endpoints -n k8s-testing
+kubectl describe node k3s-server
+kubectl describe node k3s-worker-1
 kubectl describe deployment echo-app -n k8s-testing
 kubectl describe service echo-service -n k8s-testing
-kubectl logs -n k8s-testing deploy/echo-app
+kubectl logs -n k8s-testing deployment/echo-app
 kubectl rollout status deployment/echo-app -n k8s-testing
 ```
 
-## Example Learning Exercises
+## Example Commands To Practice
 
-Here are some simple things you can practice:
-
-### Scale the application
+### See where pods are running
 
 ```bash
-kubectl scale deployment echo-app --replicas=3 -n k8s-testing
-kubectl get pods -n k8s-testing
+kubectl get pods -n k8s-testing -o wide
 ```
 
-### Inspect labels
+### Scale the deployment
+
+```bash
+kubectl scale deployment echo-app --replicas=5 -n k8s-testing
+kubectl get pods -n k8s-testing -o wide
+```
+
+### Inspect labels and selectors
 
 ```bash
 kubectl get pods -n k8s-testing --show-labels
 kubectl get service echo-service -n k8s-testing -o yaml
+kubectl get deployment echo-app -n k8s-testing -o yaml
 ```
 
-### View full YAML
+### Watch pods in real time
 
 ```bash
-kubectl get deployment echo-app -n k8s-testing -o yaml
-kubectl get service echo-service -n k8s-testing -o yaml
+kubectl get pods -n k8s-testing -w
 ```
 
-### Test the service from inside the cluster host
+### Test service access
 
 ```bash
 kubectl port-forward service/echo-service 8080:80 -n k8s-testing
 ```
 
-In another shell inside the container:
+In another shell inside `k3s-server`:
 
 ```bash
 curl http://127.0.0.1:8080
 ```
 
-You should get:
+Expected response:
 
 ```text
 hello-from-pod
 ```
 
-## Core Concepts You Can Learn Here
+### Explore cluster-wide resources
 
-- `Namespace`: a logical boundary for grouping resources
-- `Pod`: the smallest runnable unit in Kubernetes
-- `Deployment`: manages pod replicas and rollouts
-- `Service`: gives stable access to a changing set of pods
-- `Labels`: metadata used to group and select resources
-- `Selectors`: how Services and Deployments find matching pods
+```bash
+kubectl get all -A
+kubectl top nodes
+kubectl top pods -A
+```
 
-## Reset The Demo Environment
+Note: `kubectl top` works only if metrics are available in the cluster.
 
-If you run `./setup.sh` again, the namespace is recreated and the sample app is redeployed cleanly.
+## Concepts You Can Learn Here
+
+- `Control Plane`: manages the cluster and handles API requests
+- `Worker Node`: runs application workloads
+- `Namespace`: groups resources logically
+- `Pod`: the smallest deployable unit in Kubernetes
+- `Deployment`: manages replica count and pod rollout
+- `Service`: gives stable network access to pods
+- `Labels`: key-value metadata attached to objects
+- `Selectors`: rules used to match objects by label
+- `Scheduling`: how Kubernetes chooses which node runs a pod
+
+## Reset The Demo App
+
+Run `./setup.sh` again to recreate the demo namespace and workload from scratch.
+
+## Stop The Cluster
+
+From your project directory on the host machine:
+
+```bash
+docker compose down
+```
+
+To remove containers, network, and related state more cleanly:
+
+```bash
+docker compose down -v
+```
+
+## Troubleshooting
+
+If worker nodes do not join and logs mention `overlayfs snapshotter cannot be enabled`, restart the cluster after rebuilding:
+
+```bash
+docker compose down -v
+docker compose up -d --build
+```
+
+This project is configured to use the `native` snapshotter because `overlayfs` may fail in some Docker environments.
+
+If you see a `resolv.conf includes loopback or multicast nameservers` warning, that is usually non-fatal and does not stop the cluster from working.
 
 ## Notes
 
-- This is a local testing environment, not a production cluster
-- `k3s` is lightweight, so cluster startup is fast
-- The sample app is intentionally simple so you can focus on Kubernetes basics
+- This is a learning lab for local use, not a production cluster
+- `k3s` is lightweight, so it is a good fit for local multi-node experiments
+- The sample deployment uses multiple replicas so you can practice node-level inspection

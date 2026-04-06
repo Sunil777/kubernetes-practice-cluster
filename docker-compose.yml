@@ -1,0 +1,91 @@
+version: "3.9"
+
+services:
+  k3s-server:
+    build:
+      context: .
+    container_name: k3s-server
+    hostname: k3s-server
+    privileged: true
+    tmpfs:
+      - /run
+      - /var/run
+    environment:
+      K3S_TOKEN: "k3s-demo-token"
+    command:
+      - k3s
+      - server
+      - --node-name
+      - k3s-server
+      - --write-kubeconfig-mode
+      - "644"
+      - --disable
+      - traefik
+      - --disable
+      - servicelb
+      - --snapshotter
+      - native
+    ports:
+      - "6443:6443"
+    networks:
+      - k3s-net
+
+  k3s-worker-1:
+    build:
+      context: .
+    container_name: k3s-worker-1
+    hostname: k3s-worker-1
+    privileged: true
+    tmpfs:
+      - /run
+      - /var/run
+    depends_on:
+      - k3s-server
+    environment:
+      K3S_URL: "https://k3s-server:6443"
+      K3S_TOKEN: "k3s-demo-token"
+    command:
+      - k3s
+      - agent
+      - --node-name
+      - k3s-worker-1
+      - --server
+      - https://k3s-server:6443
+      - --token
+      - k3s-demo-token
+      - --snapshotter
+      - native
+    networks:
+      - k3s-net
+
+  k3s-worker-2:
+    build:
+      context: .
+    container_name: k3s-worker-2
+    hostname: k3s-worker-2
+    privileged: true
+    tmpfs:
+      - /run
+      - /var/run
+    depends_on:
+      - k3s-server
+    environment:
+      K3S_URL: "https://k3s-server:6443"
+      K3S_TOKEN: "k3s-demo-token"
+    command:
+      - k3s
+      - agent
+      - --node-name
+      - k3s-worker-2
+      - --server
+      - https://k3s-server:6443
+      - --token
+      - k3s-demo-token
+      - --snapshotter
+      - native
+    networks:
+      - k3s-net
+
+networks:
+  k3s-net:
+    driver: bridge

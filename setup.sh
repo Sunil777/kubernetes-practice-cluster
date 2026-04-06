@@ -8,7 +8,7 @@ SERVICE="echo-service"
 echo "Resetting namespace ${NAMESPACE}..."
 kubectl delete namespace "${NAMESPACE}" --ignore-not-found=true --wait=true >/dev/null 2>&1 || true
 
-echo "Ensuring the single k3s node can schedule workloads..."
+echo "Ensuring cluster nodes can schedule workloads..."
 for taint_key in node-role.kubernetes.io/master node-role.kubernetes.io/control-plane; do
   kubectl taint nodes --all "${taint_key}-" >/dev/null 2>&1 || true
 done
@@ -22,7 +22,7 @@ kind: Deployment
 metadata:
   name: echo-app
 spec:
-  replicas: 2
+  replicas: 3
   selector:
     matchLabels:
       app: echo-app
@@ -31,6 +31,15 @@ spec:
       labels:
         app: echo-app
     spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app: echo-app
+              topologyKey: kubernetes.io/hostname
       containers:
       - name: echo
         image: hashicorp/http-echo:1.0.0
@@ -76,3 +85,5 @@ echo "Deployment: ${DEPLOYMENT}"
 echo "Service: ${SERVICE}"
 echo "Pods:"
 kubectl get pods -n "${NAMESPACE}"
+echo "Nodes:"
+kubectl get nodes -o wide
